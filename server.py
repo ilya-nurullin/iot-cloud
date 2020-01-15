@@ -1,25 +1,31 @@
 #pip3 install Flask
 #pip3 install psycopg2
+#pip3 install flask-cors
 
 import psycopg2
+import psycopg2.extras
+
 import http.server
 import socketserver
 from threading import Thread
 import time
 import sys
 import json
+import time
 
 from flask import Flask
 from flask import request
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 PORT = 8999
 
 scripts = {} # '1': "print(\"It works\")"
 
 con = psycopg2.connect(host='localhost', port=5432, user='postgres',  
-    password='password', dbname='SmartHouse')
+    password='password', dbname='smarthouse')
 con.autocommit = True
 
 
@@ -27,9 +33,9 @@ con.autocommit = True
 def home():
     return {'status': 'working'}
 
-def setScript(name, code):
+def setScript(id, code):
     global scripts
-    scripts[name] = code
+    scripts[str(id)] = code
     
 @app.route('/script/add', methods=['POST'])
 def addScriptToDB():    
@@ -61,73 +67,83 @@ def addScriptToRun():
 	name = inputs['name']
 	with con:
 		cur = con.cursor()
-		query = f"SELECT  py_script FROM smarthouse.scripts WHERE script_title = \'{name}\'"
+		query = f"SELECT script_id, py_script FROM scripts WHERE script_title = \'{name}\'"
 		cur.execute(query)
 		script = cur.fetchone()
 		if(script == None):
 			return {'Error': 'ScriptNotFound'}
 		else:
-			print(script)
-			setScript(name, script[0])
+			syncEnabledScripts()
 			return {'status': 'Added to Run'}
 
 @app.route('/script/all')
 def allScripts():
-    global scripts
-    return scripts
+    return json.dumps(getScriptsByEnabled())
 
-@app.route('/script/change_status/<name>/<status>')
-def changeScriptStatus(name, status):
+@app.route('/script/change_status/<id>/<status>')
+def changeScriptStatus(id, status):
 	with con:
 		cur = con.cursor()
-		query = f"UPDATE smarthouse.scripts SET is_enabled = \'{status}\' where script_title = \'{name}\'"
+		query = f"UPDATE scripts SET is_enabled = {status} where script_id = {id}"
 		cur.execute(query)
 		#cur.flush()
-		#query = f"SELECT script_title, is_enabled FROM smarthouse.scripts WHERE script_title = \'{name}\'"
+		#query = f"SELECT script_title, is_enabled FROM scripts WHERE script_title = \'{name}\'"
 		#cur.execute(query)
 		#result = cur.fetchone()
 		#if(script == None):
 		#	return {'Error': 'ScriptNotFound'}
 		#else:
 			#return {'status': status, 'name': name }
-	return {'status': status, 'name': name }
+	syncEnabledScripts()
+	return {'status': status, 'id': id }
     
 def runner():
     global scripts
     while True:
         time.sleep(0.1)
-        for script in scripts.values():
-            exec(script)
+        if len(scripts) > 0:
+            for script in scripts.values():
+                exec(script)
 
 def insertOrUpdate(name, xmlCode, pyCode,isEnabled):
     with con:
         cur = con.cursor()
-        query = f"SELECT * FROM smarthouse.scripts WHERE script_title = \'{name}\'"
+        query = f"SELECT * FROM scripts WHERE script_title = \'{name}\'"
         cur.execute(query)
         script = cur.fetchone()
+        pyCode = pyCode.replace("'", "\\'")
         if(script == None):
-            query = f"INSERT INTO smarthouse.scripts VALUES ( 0,\'{name}\', \'{pyCode}\', \'{xmlCode}\', {isEnabled});"
+            query = f"INSERT INTO scripts(script_title, py_script, xml_script, is_enabled) VALUES ( \'{name}\', \'{pyCode}\', \'{xmlCode}\', {isEnabled});"
             cur.execute(query)
+            syncEnabledScripts()
             return("inserted")
         else:
-            query = f"UPDATE smarthouse.scripts SET py_script=\'{pyCode}\', xml_script=\'{xmlCode}\',is_enabled= {isEnabled} where script_title =\'{name}\'"
+            query = f"UPDATE scripts SET py_script=\'{pyCode}\', xml_script=\'{xmlCode}\',is_enabled= {isEnabled} where script_title =\'{name}\'"
             cur.execute(query)
+            syncEnabledScripts()
             return("updated")
 
     
 def getScriptsByEnabled(is_enabled=None):
-    whereClause = "";
+    whereClause = ""
     if (is_enabled == True):
-        whereClause = "WHERE is_enabled = True";
+        whereClause = "WHERE is_enabled = True"
     elif (is_enabled == False):
-        whereClause = "WHERE is_enabled = False";
+        whereClause = "WHERE is_enabled = False"
     with con:
-        cur = con.cursor()
-        query = f"SELECT script_title, py_script FROM smarthouse.scripts {whereClause}"
+        cur = con.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+        query = f"SELECT script_id, script_title, py_script, is_enabled FROM scripts {whereClause}"
         cur.execute(query)
         rows = cur.fetchall()
     return rows
-    
+
+def syncEnabledScripts():
+    global scripts
+    rows=getScriptsByEnabled(True)
+    scripts = {}
+    for row in rows:
+        setScript(row['script_id'], row['py_script'])   
+
 def server():
     global PORT
     global scripts
@@ -135,7 +151,7 @@ def server():
     #load all enabled scripts to dictionary
     rows=getScriptsByEnabled(True)
     for row in rows:
-        print(row[0], row[1])    
+        setScript(row['script_id'], row['py_script'])   
     app.run(host="0.0.0.0", port=PORT)
 
 thread1 = Thread( target=runner )
