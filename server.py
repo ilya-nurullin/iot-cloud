@@ -113,12 +113,12 @@ def insertOrUpdate(name, xmlCode, pyCode,isEnabled):
         script = cur.fetchone()
         pyCode = pyCode.replace("'", "\\'")
         if(script == None):
-            query = f"INSERT INTO scripts(script_title, py_script, xml_script, is_enabled) VALUES ( \'{name}\', \'{pyCode}\', \'{xmlCode}\', {isEnabled});"
+            query = f"INSERT INTO scripts(script_title, py_script, xml_script, is_enabled) VALUES ( \'{name}\', E\'{pyCode}\', \'{xmlCode}\', {isEnabled});"
             cur.execute(query)
             syncEnabledScripts()
             return("inserted")
         else:
-            query = f"UPDATE scripts SET py_script=\'{pyCode}\', xml_script=\'{xmlCode}\',is_enabled= {isEnabled} where script_title =\'{name}\'"
+            query = f"UPDATE scripts SET py_script=E\'{pyCode}\', xml_script=\'{xmlCode}\',is_enabled= {isEnabled} where script_title =\'{name}\'"
             cur.execute(query)
             syncEnabledScripts()
             return("updated")
