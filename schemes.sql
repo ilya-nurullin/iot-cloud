@@ -6,3 +6,10 @@ create table scripts
     xml_script   text,
     is_enabled   boolean default false
 );
+CREATE TABLE devices
+(
+    device_id integer GENERATED ALWAYS AS IDENTITY, 
+	device_title text,
+    is_connected boolean,
+    PRIMARY KEY (device_id)
+);

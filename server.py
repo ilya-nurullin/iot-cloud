@@ -57,7 +57,7 @@ def addScriptToDB():
     xmlCode = inputs['xmlCode']
     pyCode = inputs['pyCode']
     is_enabled = inputs['is_enabled']
-    return insertOrUpdate(name, xmlCode, pyCode,is_enabled)
+    return insertOrUpdateScript(name, xmlCode, pyCode,is_enabled)
         
 @app.route('/script/addToRun', methods=['POST'])
 def addScriptToRun():
@@ -105,7 +105,7 @@ def runner():
             for script in scripts.values():
                 exec(script)
 
-def insertOrUpdate(name, xmlCode, pyCode,isEnabled):
+def insertOrUpdateScript(name, xmlCode, pyCode,isEnabled):
     with con:
         cur = con.cursor()
         query = f"SELECT * FROM scripts WHERE script_title = \'{name}\'"
@@ -123,7 +123,15 @@ def insertOrUpdate(name, xmlCode, pyCode,isEnabled):
             syncEnabledScripts()
             return("updated")
 
-    
+@app.route('/script/getById/<id>')
+def GetScriptById(id):
+    with con:
+        cur = con.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+        query = f"SELECT script_id, script_title, py_script, xml_script, is_enabled FROM scripts WHERE script_id = {id}"
+        cur.execute(query)
+        return json.dumps(cur.fetchone())
+
+
 def getScriptsByEnabled(is_enabled=None):
     whereClause = ""
     if (is_enabled == True):
@@ -136,6 +144,45 @@ def getScriptsByEnabled(is_enabled=None):
         cur.execute(query)
         rows = cur.fetchall()
     return rows
+#----
+# DEVICES
+@app.route('/device/getById/<id>')
+def GetDeviceById(id):
+    with con:
+        cur = con.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+        query = f"SELECT device_id, device_title, is_connected FROM devices WHERE device_id = {id}"
+        cur.execute(query)
+        return json.dumps(cur.fetchone())
+@app.route('/device/add', methods=['POST'])
+def AddDevice():
+    inputs = request.get_json()
+    
+    if ('title' not in inputs):
+        return ({'status': 'data_error', 'message': 'title expected'}, 400)
+    if ('is_connected' not in inputs):
+        return ({'status': 'data_error', 'message': 'is_connected status expected'}, 400)
+        
+    title = inputs['title']
+    is_connected = inputs['is_connected']
+    return insertOrUpdateDevice(title,is_connected)
+
+def insertOrUpdateDevice(title, is_connected):
+    with con:
+        cur = con.cursor()
+        query = f"SELECT * FROM devices WHERE device_title = \'{title}\'"
+        cur.execute(query)
+        script = cur.fetchone()
+        if(script == None):
+            query = f"INSERT INTO devices(device_title, is_connected) VALUES (\'{title}\', {is_connected});"
+            cur.execute(query)
+            return("device inserted")
+        else:
+            query = f"UPDATE devices SET device_title=\'{title}\' ,is_connected= {is_connected} where device_title =\'{title}\'"
+            cur.execute(query)
+            return("device updated")
+
+#----
+
 
 def syncEnabledScripts():
     global scripts
