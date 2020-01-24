@@ -152,7 +152,10 @@ def GetDeviceById(id):
         cur = con.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
         query = f"SELECT device_id, device_title, is_connected FROM devices WHERE device_id = {id}"
         cur.execute(query)
-        return json.dumps(cur.fetchone())
+        row = cur.fetchone()
+        if (row == None):
+            return {'Error': 'DeviceNotFound'}
+        return json.dumps()
 @app.route('/device/add', methods=['POST'])
 def AddDevice():
     inputs = request.get_json()
