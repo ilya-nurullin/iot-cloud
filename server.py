@@ -12,6 +12,8 @@ import time
 import sys
 import json
 import time
+import paho.mqtt.client as mqtt
+from influxdb import InfluxDBClient
 
 from flask import Flask
 from flask import request
@@ -23,6 +25,12 @@ CORS(app)
 PORT = 8999
 
 scripts = {} # '1': "print(\"It works\")"
+
+client = InfluxDBClient('localhost', 8086, 'root', 'root', 'iot')
+
+mqttc=mqtt.Client()
+mqttc.connect("localhost",1883,60)
+mqttc.loop_start()
 
 con = psycopg2.connect(host='localhost', port=5432, user='postgres',  
     password='password', dbname='smarthouse')
