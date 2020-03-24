@@ -111,7 +111,11 @@ def runner():
         time.sleep(0.1)
         if len(scripts) > 0:
             for script in scripts.values():
-                exec(script)
+                try:
+                    exec(script)
+                except:
+                    print("Unexpected error:")
+                    print(sys.exc_info())
 
 def insertOrUpdateScript(name, xmlCode, pyCode,isEnabled):
     with con:
