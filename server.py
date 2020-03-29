@@ -19,6 +19,10 @@ from flask import Flask
 from flask import request
 from flask_cors import CORS
 
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 app = Flask(__name__)
 CORS(app)
 
@@ -26,14 +30,21 @@ PORT = 8999
 
 scripts = {} # '1': "print(\"It works\")"
 
-client = InfluxDBClient('localhost', 8086, 'root', 'root', 'iot')
+client = InfluxDBClient(os.getenv('INFLUX_HOST'), 
+                        int(os.getenv('INFLUX_PORT')),
+                        os.getenv('INFLUX_USER'),
+                        os.getenv('INFLUX_PASS'), 
+                        os.getenv('INFLUX_DB'))
 
 mqttc=mqtt.Client()
-mqttc.connect("localhost",1883,60)
+mqttc.connect(os.getenv('MQTT_HOST'), int(os.getenv('MQTT_PORT')))
 mqttc.loop_start()
 
-con = psycopg2.connect(host='localhost', port=5432, user='postgres',  
-    password='password', dbname='smarthouse')
+con = psycopg2.connect(host=os.getenv('POSTGRESQL_HOST'), 
+                        port=os.getenv('POSTGRESQL_PORT'), 
+                        user=os.getenv('POSTGRESQL_USER'),  
+                        password=os.getenv('POSTGRESQL_PASS'), 
+                        dbname=os.getenv('POSTGRESQL_DB'))
 con.autocommit = True
 
 
@@ -152,7 +163,7 @@ def getScriptsByEnabled(is_enabled=None):
         whereClause = "WHERE is_enabled = False"
     with con:
         cur = con.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
-        query = f"SELECT script_id, script_title, py_script, is_enabled FROM scripts {whereClause}"
+        query = f"SELECT script_id, script_title, py_script, is_enabled FROM scripts {whereClause} ORDER BY script_id"
         cur.execute(query)
         rows = cur.fetchall()
     return rows
